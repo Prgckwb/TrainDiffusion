@@ -17,18 +17,35 @@ class Arguments:
     comment = ""
     doc = "hoge"
     verbose = "info"
-    fid = None
-    interpolation = None
     resume_training = None
-    image_folder = "images"
     ni = None
     sample_type = "generalized"
     skip_type = "uniform"
     timesteps = 1000
     eta = 0.0
+
+    # sampleの仕方などなど
     sequence = None
+    interpolation = None
+    fid = None
+
+    sample_options = ["sequence", "interpolation", "fid"]
+    sample_mode = sample_options[1]
+
+    image_folder = "images"
 
     log_path = "log"
+    use_pretrained = True
+
+    def __post_init__(self):
+        if self.sample_mode == self.sample_options[0]:
+            self.sequence = True
+        elif self.sample_mode == self.sample_options[1]:
+            self.interpolation = True
+        elif self.sample_mode == self.sample_options[2]:
+            self.fid = True
+
+        self.image_folder = f"{self.image_folder}/{self.sample_mode}"
 
 
 @dataclasses.dataclass

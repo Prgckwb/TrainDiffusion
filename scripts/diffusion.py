@@ -13,13 +13,6 @@ from scripts.dataset import get_dataset
 from scripts.utils import *
 
 
-def torch2hwcuint8(x, clip=False):
-    if clip:
-        x = torch.clamp(x, -1, 1)
-    x = (x + 1.0) / 2.0
-    return x
-
-
 def get_beta_schedule(beta_schedule, *, beta_start, beta_end, num_diffusion_timesteps):
     def sigmoid(x):
         return 1 / (np.exp(-x) + 1)
@@ -126,6 +119,8 @@ class Diffusion(object):
                 ema_helper.load_state_dict(states[4])
 
         for epoch in tqdm(range(start_epoch, self.config.training.n_epochs)):
+            print(f"Epoch: {epoch}")
+
             data_start = time.time()
             data_time = 0
             for i, (x, y) in enumerate(tqdm(train_loader, leave=False)):
@@ -180,41 +175,26 @@ class Diffusion(object):
 
                 data_start = time.time()
 
-    def sample(self):
+    def sample(self, resume_num=None):
         model = Model(self.config)
 
-        if not self.args.use_pretrained:
-            if getattr(self.config.sampling, "ckpt_id", None) is None:
-                states = torch.load(
-                    os.path.join(self.args.log_path, "ckpt.pth"),
-                    map_location=self.config.device,
-                )
+        if self.args.use_pretrained:  # use_pretrained = True
+            if resume_num is not None:
+                ckpt = f"log/ckpt_{resume_num}.pth"  # TODO: ckptのパス？
             else:
-                states = torch.load(
-                    os.path.join(
-                        self.args.log_path, f"ckpt_{self.config.sampling.ckpt_id}.pth"
-                    ),
-                    map_location=self.config.device,
-                )
-            model = model.to(self.device)
-            model = torch.nn.DataParallel(model)
-            model.load_state_dict(states[0], strict=True)
+                ckpt = f"log/ckpt.pth"
 
-            if self.config.model.ema:
-                ema_helper = EMAHelper(mu=self.config.model.ema_rate)
-                ema_helper.register(model)
-                ema_helper.load_state_dict(states[-1])
-                ema_helper.ema(model)
-            else:
-                ema_helper = None
-        else:
-            ckpt = "hoge"  # TODO: ckptのパス？
             print("Loading checkpoint {}".format(ckpt))
-            model.load_state_dict(torch.load(ckpt, map_location=self.device))
+
+            states = torch.load(ckpt, map_location=self.device)
             model.to(self.device)
             model = torch.nn.DataParallel(model)
+            model.load_state_dict(states[0])
 
         model.eval()
+
+        # sampleの出力先ディレクトリの作成
+        os.makedirs(self.args.image_folder, exist_ok=True)
 
         if self.args.fid:
             self.sample_fid(model)
@@ -318,6 +298,7 @@ class Diffusion(object):
             tvu.save_image(x[i], os.path.join(self.args.image_folder, f"{i}.png"))
 
     def sample_image(self, x, model, last=True):
+        print("[DEBUG] START sample_image()")
         try:
             skip = self.args.skip
         except Exception:
@@ -337,7 +318,7 @@ class Diffusion(object):
                 seq = [int(s) for s in list(seq)]
             else:
                 raise NotImplementedError
-            from denoising import generalized_steps
+            from scripts.denoising import generalized_steps
 
             xs = generalized_steps(x, seq, model, self.betas, eta=self.args.eta)
             x = xs
@@ -357,11 +338,15 @@ class Diffusion(object):
                 raise NotImplementedError
             from denoising import ddpm_steps
 
+            print("[DEBUG] START ddpm_steps()")
             x = ddpm_steps(x, seq, model, self.betas)
+            print("[DEBUG] END ddpm_steps()")
         else:
             raise NotImplementedError
         if last:
             x = x[0][-1]
+
+        print("[DEBUG] END sample_image()")
         return x
 
     def test(self):

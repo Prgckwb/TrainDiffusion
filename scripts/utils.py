@@ -1,11 +1,5 @@
-import glob
-
-import numpy as np
+import torch
 import torch.optim as optim
-import torchvision.transforms.functional as F
-from PIL import Image
-from torch.utils import data
-from torchvision import transforms
 
 
 def get_optimizer(config, parameters):
@@ -22,77 +16,54 @@ def get_optimizer(config, parameters):
             'Optimizer {} not understood.'.format(config.optim.optimizer))
 
 
-class Crop(object):
-    def __init__(self, x1, x2, y1, y2):
-        self.x1 = x1
-        self.x2 = x2
-        self.y1 = y1
-        self.y2 = y2
-
-    def __call__(self, img):
-        return F.crop(img, self.x1, self.y1, self.x2 - self.x1, self.y2 - self.y1)
-
-    def __repr__(self):
-        return self.__class__.__name__ + "(x1={}, x2={}, y1={}, y2={})".format(
-            self.x1, self.x2, self.y1, self.y2
-        )
+def logit_transform(image, lam=1e-6):
+    image = lam + (1 - 2 * lam) * image
+    return torch.log(image) - torch.log1p(-image)
 
 
-class MyDataset(data.Dataset):
-    def __init__(self, image_dir, transform=None):
-        self.transform = transform
-        self.imgdir = image_dir
-        self.image_list = sorted(glob.glob(self.imgdir + "/*"))
+def data_transform(config, X):
+    if config.data.uniform_dequantization:
+        X = X / 256.0 * 255.0 + torch.rand_like(X) / 256.0
+    if config.data.gaussian_dequantization:
+        X = X + torch.randn_like(X) * 0.01
 
-    def __len__(self):
-        return len(self.image_list)
+    if config.data.rescaled:
+        X = 2 * X - 1.0
+    elif config.data.logit_transform:
+        X = logit_transform(X)
 
-    def __getitem__(self, index):
-        img = Image.open(self.image_list[index])
-        img = self.transform(img)
-        label = 0
+    if hasattr(config, "image_mean"):
+        return X - config.image_mean.to(X.device)[None, ...]
 
-        return img, label
+    return X
 
 
-def get_dataset(args, config):
-    if config.data.random_flip is False:
-        tran_transform = test_transform = transforms.Compose(
-            [transforms.Resize(config.data.image_size), transforms.ToTensor()]
-        )
+def inverse_data_transform(config, X):
+    if hasattr(config, "image_mean"):
+        X = X + config.image_mean.to(X.device)[None, ...]
+
+    if config.data.logit_transform:
+        X = torch.sigmoid(X)
+    elif config.data.rescaled:
+        X = (X + 1.0) / 2.0
+
+    return torch.clamp(X, 0.0, 1.0)
+
+
+def noise_estimation_loss(model,
+                          x0: torch.Tensor,
+                          t: torch.LongTensor,
+                          e: torch.Tensor,
+                          b: torch.Tensor, keepdim=False):
+    a = (1 - b).cumprod(dim=0).index_select(0, t).view(-1, 1, 1, 1)
+    x = x0 * a.sqrt() + e * (1.0 - a).sqrt()
+    output = model(x, t.float())
+    if keepdim:
+        return (e - output).square().sum(dim=(1, 2, 3))
     else:
-        tran_transform = transforms.Compose(
-            [
-                transforms.Resize(config.data.image_size),
-                transforms.RandomHorizontalFlip(p=0.5),
-                transforms.ToTensor(),
-            ]
-        )
-        test_transform = transforms.Compose(
-            [transforms.Resize(config.data.image_size), transforms.ToTensor()]
-        )
+        return (e - output).square().sum(dim=(1, 2, 3)).mean(dim=0)
 
-    # TODO: random_flipに対応する？
-    transform = transforms.Compose([
-        transforms.Resize(config.data.image_size),
-        transforms.ToTensor(),
-    ])
 
-    # TODO: ハードコーディングを避ける！！！
-    dataset = MyDataset("../data/ramen", transform=transform)
-
-    # datasetの分割
-    num_items = len(dataset)
-    indices = list(range(num_items))
-    random_state = np.random.get_state()
-    np.random.seed(2019)
-    np.random.shuffle(indices)
-    np.random.set_state(random_state)
-    train_indices, test_indices = (
-        indices[: int(num_items * 0.9)],
-        indices[int(num_items * 0.9):],
-    )
-    test_dataset = data.Subset(dataset, test_indices)
-    dataset = data.Subset(dataset, train_indices)
-
-    return dataset, test_dataset
+loss_registry = {
+    'simple': noise_estimation_loss,
+}

@@ -175,14 +175,14 @@ class Diffusion(object):
 
                 data_start = time.time()
 
-    def sample(self, resume_num=None):
+    def sample(self, ckpt_num=None):
         model = Model(self.config)
 
-        if self.args.use_pretrained:  # use_pretrained = True
-            if resume_num is not None:
-                ckpt = f"log/ckpt_{resume_num}.pth"  # TODO: ckptのパス？
+        if self.args.use_pretrained:
+            if ckpt_num is not None:
+                ckpt = f"{self.args.log_path}/ckpt_{ckpt_num}.pth"  # TODO: ckptのパス？
             else:
-                ckpt = f"log/ckpt.pth"
+                ckpt = f"{self.args.log_path}/ckpt.pth"
 
             print("Loading checkpoint {}".format(ckpt))
 
@@ -291,11 +291,13 @@ class Diffusion(object):
 
         # Hard coded here, modify to your preferences
         with torch.no_grad():
-            for i in range(0, x.size(0), 8):
+            for i in tqdm(range(0, x.size(0), 8)):
                 xs.append(self.sample_image(x[i: i + 8], model))
         x = inverse_data_transform(config, torch.cat(xs, dim=0))
         for i in range(x.size(0)):
-            tvu.save_image(x[i], os.path.join(self.args.image_folder, f"{i}.png"))
+            path = os.path.join(self.args.image_folder, f"{i}.png")
+            print(f"[DEBUG] Saving {path}")
+            tvu.save_image(x[i], path)
 
     def sample_image(self, x, model, last=True):
         print("[DEBUG] START sample_image()")
@@ -320,7 +322,10 @@ class Diffusion(object):
                 raise NotImplementedError
             from scripts.denoising import generalized_steps
 
+            print("[DEBUG] START generalized_steps()")
             xs = generalized_steps(x, seq, model, self.betas, eta=self.args.eta)
+            print("[DEBUG] END generalized_steps()")
+
             x = xs
         elif self.args.sample_type == "ddpm_noisy":
             if self.args.skip_type == "uniform":

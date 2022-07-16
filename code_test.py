@@ -4,7 +4,7 @@ import torch
 from torch.nn import DataParallel
 
 from config.options import parse_args_and_config
-from main import init_cmdline_arguments
+from main import init_options
 from models.diffusion_model import Model
 from scripts.dataset import get_dataset
 from scripts.diffusion import Diffusion
@@ -26,7 +26,7 @@ def test_get_dataset():
 
 def test_generate():
     args, config = parse_args_and_config()
-    args = init_cmdline_arguments(args)
+    args = init_options(args)
     runner = Diffusion(args, config)
 
     model = Model(config)

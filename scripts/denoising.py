@@ -1,4 +1,5 @@
 import torch
+from tqdm import tqdm
 
 
 def compute_alpha(beta, t):

@@ -29,7 +29,7 @@ def generalized_steps(x, seq, model, b, **kwargs):
             x0_t = (xt - et * (1 - at).sqrt()) / at.sqrt()
             x0_preds.append(x0_t.to('cpu'))
             c1 = (
-                kwargs.get("eta", 0) * ((1 - at / at_next) * (1 - at_next) / (1 - at)).sqrt()
+                    kwargs.get("eta", 0) * ((1 - at / at_next) * (1 - at_next) / (1 - at)).sqrt()
             )
             c2 = ((1 - at_next) - c1 ** 2).sqrt()
             xt_next = at_next.sqrt() * x0_t + c1 * torch.randn_like(x) + c2 * et
@@ -60,8 +60,8 @@ def ddpm_steps(x, seq, model, b, **kwargs):
             x0_from_e = torch.clamp(x0_from_e, -1, 1)
             x0_preds.append(x0_from_e.to('cpu'))
             mean_eps = (
-                (atm1.sqrt() * beta_t) * x0_from_e + ((1 - beta_t).sqrt() * (1 - atm1)) * x
-            ) / (1.0 - at)
+                               (atm1.sqrt() * beta_t) * x0_from_e + ((1 - beta_t).sqrt() * (1 - atm1)) * x
+                       ) / (1.0 - at)
 
             mean = mean_eps
             noise = torch.randn_like(x)

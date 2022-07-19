@@ -10,12 +10,15 @@ def init_options():
     parser.add_argument("-m", "--mode", required=True, type=str)
     # parser.add_argument("-n", "--resume_num", default=None, type=int)
     parser.add_argument("-s", "--size", type=int, default=64)
-    parser.add_argument("-br", "--train_batch_size", type=int, default=128)
+    parser.add_argument("-n", "--checkpoint_num", type=int)
+    parser.add_argument("-b", "--train_batch_size", type=int, default=128)
 
     cmdline_args = parser.parse_args()
     mode = cmdline_args.mode
 
     args, config = parse_args_and_config(cmdline_args.size)
+
+    config.training.batch_size = cmdline_args.train_batch_size
 
     if mode == "test":
         args.test = True
@@ -23,6 +26,7 @@ def init_options():
     elif mode == "sample":
         args.test = False
         args.sample = True
+        args.sample_ckpt_num = cmdline_args.checkpoint_num
     elif mode == "train":
         args.test = False
         args.sample = False
@@ -32,11 +36,16 @@ def init_options():
 
 def main():
     args, config = init_options()
+    print(f"[DEBUG] train_batch_size: {config.training.batch_size}")
 
     runner = Diffusion(args, config)
 
     if args.sample:
-        runner.sample(ckpt_num=40000)
+        ckpt_num = args.sample_ckpt_num
+        if ckpt_num is None:
+            print("Please select ckpt_num")
+            return
+        runner.sample(ckpt_num=ckpt_num)
     elif args.test:
         runner.test()
     else:

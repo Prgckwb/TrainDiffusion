@@ -14,7 +14,12 @@ def generalized_steps(x, seq, model, b, **kwargs):
         seq_next = [-1] + list(seq[:-1])
         x0_preds = []
         xs = [x]
-        for i, j in zip(reversed(seq), reversed(seq_next)):
+
+        iters = zip(
+            tqdm(reversed(seq), total=len(seq), desc="[generalized_steps()]"),
+            reversed(seq_next),
+        )
+        for i, j in iters:
             t = (torch.ones(n) * i).to(x.device)
             next_t = (torch.ones(n) * j).to(x.device)
             at = compute_alpha(b, t.long())

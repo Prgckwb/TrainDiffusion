@@ -25,8 +25,7 @@ def test_get_dataset():
 
 
 def test_generate():
-    args, config = parse_args_and_config()
-    args = init_options(args)
+    args, config = init_options()
     runner = Diffusion(args, config)
 
     model = Model(config)

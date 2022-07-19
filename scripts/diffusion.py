@@ -251,11 +251,12 @@ class Diffusion(object):
 
         x = [inverse_data_transform(config, y) for y in x]
 
-        for i in range(len(x)):
+        for i in tqdm(range(len(x)), desc="[sample_sequence()->save_image()]"):
             for j in range(x[i].size(0)):
-                tvu.save_image(
-                    x[i][j], os.path.join(self.args.image_folder, f"{j}_{i}.png")
-                )
+                path = os.path.join(self.args.image_folder, f"{j}_{i}.png")
+                tvu.save_image(x[i][j], path)
+
+                # print(f"[DEBUG] Saving {path}: sample_sequence()")
 
     def sample_interpolation(self, model):
         config = self.config
@@ -296,11 +297,11 @@ class Diffusion(object):
         x = inverse_data_transform(config, torch.cat(xs, dim=0))
         for i in range(x.size(0)):
             path = os.path.join(self.args.image_folder, f"{i}.png")
-            print(f"[DEBUG] Saving {path}")
+            # print(f"[DEBUG] Saving {path}: sample_interpolation()")
             tvu.save_image(x[i], path)
 
     def sample_image(self, x, model, last=True):
-        print("[DEBUG] START sample_image()")
+        # print("[DEBUG] START sample_image()")
         try:
             skip = self.args.skip
         except Exception:
@@ -322,9 +323,9 @@ class Diffusion(object):
                 raise NotImplementedError
             from scripts.denoising import generalized_steps
 
-            print("[DEBUG] START generalized_steps()")
+            # print("[DEBUG] START generalized_steps()")
             xs = generalized_steps(x, seq, model, self.betas, eta=self.args.eta)
-            print("[DEBUG] END generalized_steps()")
+            # print("[DEBUG] END generalized_steps()")
 
             x = xs
         elif self.args.sample_type == "ddpm_noisy":
@@ -343,15 +344,15 @@ class Diffusion(object):
                 raise NotImplementedError
             from denoising import ddpm_steps
 
-            print("[DEBUG] START ddpm_steps()")
+            # print("[DEBUG] START ddpm_steps()")
             x = ddpm_steps(x, seq, model, self.betas)
-            print("[DEBUG] END ddpm_steps()")
+            # print("[DEBUG] END ddpm_steps()")
         else:
             raise NotImplementedError
         if last:
             x = x[0][-1]
 
-        print("[DEBUG] END sample_image()")
+        # print("[DEBUG] END sample_image()")
         return x
 
     def test(self):

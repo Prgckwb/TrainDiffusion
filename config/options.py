@@ -31,6 +31,7 @@ class Arguments:
 
     sample_options = ["sequence", "interpolation", "fid"]
     sample_mode = sample_options[0]
+    sample_ckpt_num = None
 
     image_folder = "images"
     log_path = "logs"
@@ -125,7 +126,8 @@ def parse_args_and_config(img_size):
     elif args.sample_mode == args.sample_options[2]:
         args.fid = True
 
-    print(args.sample_mode)
+    print(f"[DEBUG] sample_mode: {args.sample_mode} parse_args_and_config()")
+
     config.data.image_size = img_size
     args.image_folder = f"{args.image_folder}/size_{img_size}/{args.sample_mode}"
     args.log_path = f"{args.log_path}/size_{img_size}"

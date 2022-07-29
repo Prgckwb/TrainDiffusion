@@ -107,8 +107,11 @@ class Diffusion(object):
             ema_helper = None
 
         start_epoch, step = 0, 0
+
         if self.args.resume_training:
-            states = torch.load(os.path.join(self.args.log_path, "ckpt.pth"))
+            ckpt_num = args.resume_num
+            ckpt_path = os.path.join(self.args.log_path, f"ckpt_{ckpt_num}.pth")
+            states = torch.load(ckpt_path)
             model.load_state_dict(states[0])
 
             states[1]["param_groups"][0]["eps"] = self.config.optim.eps
@@ -119,7 +122,7 @@ class Diffusion(object):
                 ema_helper.load_state_dict(states[4])
 
         for epoch in tqdm(range(start_epoch, self.config.training.n_epochs)):
-            print(f"Epoch: {epoch}")
+            print(f"Epoch: {epoch}/{config.training.n_epochs}")
 
             data_start = time.time()
             data_time = 0
@@ -236,9 +239,10 @@ class Diffusion(object):
 
     def sample_sequence(self, model):
         config = self.config
+        n = 15
 
         x = torch.randn(
-            8,
+            n,
             config.data.channels,
             config.data.image_size,
             config.data.image_size,

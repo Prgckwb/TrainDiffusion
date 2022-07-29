@@ -17,7 +17,10 @@ class Arguments:
     comment = ""
     doc = "hoge"
     verbose = "info"
+
     resume_training = None
+    resume_num = None
+
     ni = None
     sample_type = "generalized"
     skip_type = "uniform"
@@ -41,7 +44,6 @@ class Arguments:
 
 @dataclasses.dataclass
 class Data:
-    # image_sizeを変えるとload_state_dictでエラーが出るかも
     image_size = 64
     channels = 3
     logit_transform = False
@@ -112,13 +114,25 @@ class Config:
     optim = Optimizer()
 
 
-def parse_args_and_config(img_size):
+def parse_args_and_config(cmdline_args):
     args = Arguments()
     config = Config()
+
+    img_size = cmdline_args.size
 
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
 
+    # Modeの切り替え sample OR test OR train
+    if args.sample:
+        print("[SAMPLE]")
+        print(f"[DEBUG] sample_mode: {args.sample_mode} parse_args_and_config()")
+    elif args.test:
+        print(f"[TEST]")
+    else:
+        print(f"[TRAIN]")
+
+    # sample modeの場合にサンプリング手法を指定
     if args.sample_mode == args.sample_options[0]:
         args.sequence = True
     elif args.sample_mode == args.sample_options[1]:
@@ -126,14 +140,27 @@ def parse_args_and_config(img_size):
     elif args.sample_mode == args.sample_options[2]:
         args.fid = True
 
-    print(f"[DEBUG] sample_mode: {args.sample_mode} parse_args_and_config()")
-
     config.data.image_size = img_size
     args.image_folder = f"{args.image_folder}/size_{img_size}/{args.sample_mode}"
     args.log_path = f"{args.log_path}/size_{img_size}"
 
-    if img_size == 64:
-        args.log_path = "log"
+    config.training.batch_size = cmdline_args.train_batch_size
+    mode = cmdline_args.mode
+
+    if mode == "test":
+        args.test = True
+        args.sample = False
+    elif mode == "sample":
+        args.test = False
+        args.sample = True
+        args.sample_ckpt_num = cmdline_args.checkpoint_num
+    elif mode == "train":
+        args.test = False
+        args.sample = False
+
+    if cmdline_args.resume_num is not None:
+        args.resume_training = True
+        args.resume_num = cmdline_args.resume_num
 
     return args, config
 
